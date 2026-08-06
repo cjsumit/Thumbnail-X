@@ -37,6 +37,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             toast.success(data.message)
         } catch (error: any) {
             console.log(error);
+            console.log(error.response?.data);
         }
     };
 
@@ -50,6 +51,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             toast.success(data.message)
         } catch (error: any) {
             console.log(error);
+            console.log(error.response?.data);
         }
     };
 
@@ -62,6 +64,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             toast.success(data.message)
         } catch (error: any) {
             console.log(error);
+            console.log(error.response?.data);
         }
     };
 
@@ -74,6 +77,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             }
         } catch (error: any) {
             console.log(error);
+            console.log(error.response?.data);
         }
     }
 
