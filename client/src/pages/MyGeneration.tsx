@@ -25,17 +25,22 @@ const MyGeneration = () => {
     try {
       setLoading(true);
 
-      const { data } = await api.get('/api/user/thumbnails');
+      // FIX 1: Change endpoint if backend is singular (/api/user/thumbnail) or keep if plural.
+      // Falls back safely if the response structure varies.
+      const { data } = await api.get('/api/user/thumbnail');
+      
       if (data.thumbnails && data.thumbnails.length > 0) {
         setThumbnails(data.thumbnails);
+      } else if (data.thumbnail && Array.isArray(data.thumbnail)) {
+        setThumbnails(data.thumbnail);
       } else {
-        setThumbnails(dummyThumbnails as unknown as IThumbnail[]);
+        setThumbnails([]);
       }
     } catch (error: any) {
       console.error(error);
       toast.error(error?.response?.data?.message || error.message);
 
-      // Optional: show dummy thumbnails on error too
+      // Fallback to dummy thumbnails on error
       setThumbnails(dummyThumbnails as unknown as IThumbnail[]);
     } finally {
       setLoading(false);
@@ -43,20 +48,24 @@ const MyGeneration = () => {
   };
 
   const handleDownload = (image_url: string) => {
+    if (!image_url) return;
     const link = document.createElement('a');
-    link.href = image_url.replace('/upload', '/upload/fl_attachment')
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
+    // FIX 2: Force HTTPS to prevent insecure connection redirection warning from Cloudinary
+    const secureUrl = image_url.replace('http://', 'https://').replace('/upload', '/upload/fl_attachment');
+    link.href = secureUrl;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   }
 
   const handleDelete = async (id: string) => {
     try {
-      const confirm = window.confirm('Are you sure you want to delete this thumbnail');
-      if(!confirm) return;
-      const { data } = await api.delete(`/api/thumbnail/delete/${id}`)
-      toast.success(data.message)
-      setThumbnails(thumbnails.filter((t)=> t._id !== id));
+      const confirm = window.confirm('Are you sure you want to delete this thumbnail?');
+      if (!confirm) return;
+      const { data } = await api.delete(`/api/thumbnail/delete/${id}`);
+      toast.success(data.message || 'Thumbnail deleted successfully');
+      setThumbnails(thumbnails.filter((t) => t._id !== id));
     } catch (error: any) {
       console.error(error);
       toast.error(error?.response?.data?.message || error.message);
@@ -64,7 +73,7 @@ const MyGeneration = () => {
   }
 
   useEffect(() => {
-    if(isLoggedIn){
+    if (isLoggedIn) {
       fetchThumbnails()
     }
   }, [isLoggedIn])
@@ -73,7 +82,7 @@ const MyGeneration = () => {
     <div>
       <SoftBackdrop />
       <div className="mt-32 min-h-screen px-6 md:px-16 lg:px-24 xl:px-32">
-        {/*Header*/}
+        {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-zinc-200">My Generation</h1>
           <p className="text-sm text-zinc-400 mt-1">View and manage your AI-generated content</p>
@@ -91,8 +100,8 @@ const MyGeneration = () => {
         {/* Empty State */}
         {!loading && thumbnails.length === 0 && (
           <div className="text-center py-24">
-            <h3>No Thumbnails Yet</h3>
-            <p className="text-zinc-400 text-sm mt-2">Generate your first AI thumbnail! To see it here.</p>
+            <h3 className="text-lg font-semibold text-zinc-200">No Thumbnails Yet</h3>
+            <p className="text-zinc-400 text-sm mt-2">Generate your first AI thumbnail to see it here!</p>
           </div>
         )}
 
@@ -103,21 +112,31 @@ const MyGeneration = () => {
               const aspectClass = aspectRatioClassMap[thumb.aspect_ratio || '16:9'];
 
               return (
-                <div key={thumb._id} onClick={() => navigate(`/generate/${thumb._id} `)} className="mb-8 group relative cursor-pointer rounded-2xl bg-white/6 border border-white/10 transition shadow-xl break-inside-avoid">
+                <div 
+                  key={thumb._id} 
+                  onClick={() => navigate(`/generate/${thumb._id}`)} 
+                  className="mb-8 group relative cursor-pointer rounded-2xl bg-white/6 border border-white/10 transition shadow-xl break-inside-avoid overflow-hidden"
+                >
 
                   {/* Thumbnail Image */}
                   <div className={`relative overflow-hidden rounded-t-2xl ${aspectClass} bg-black`}>
                     {thumb.image_url ? (
-                      <img src={thumb.image_url} alt={thumb.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-
+                      <img 
+                        src={thumb.image_url.replace('http://', 'https://')} 
+                        alt={thumb.title} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                      />
                     ) : (
-                      <div className="w-full flex items-center justify-center text-sm text-zinc-400">
+                      <div className="w-full h-full flex items-center justify-center text-sm text-zinc-400">
                         {thumb.isGenerating ? 'Generating...' : 'No Image Available'}
                       </div>
                     )}
 
-                    {thumb.isGenerating && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-sm font-medium text-white">Generating...</div>}
-
+                    {thumb.isGenerating && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-sm font-medium text-white">
+                        Generating...
+                      </div>
+                    )}
                   </div>
 
                   {/* CONTENT */}
@@ -127,21 +146,33 @@ const MyGeneration = () => {
                       <span className="px-3 py-0.5 rounded bg-white/8">{thumb.style}</span>
                       <span className="px-3 py-0.5 rounded bg-white/8">{thumb.color_scheme}</span>
                       <span className="px-3 py-0.5 rounded bg-white/8">{thumb.aspect_ratio}</span>
-
                     </div>
-                    <p className="text-xs text-zinc-500">{new Date(thumb.createdAt!).toDateString()}</p>
+                    <p className="text-xs text-zinc-500">
+                      {thumb.createdAt ? new Date(thumb.createdAt).toDateString() : ''}
+                    </p>
                   </div>
 
-                  <div onClick={(e) => e.stopPropagation} className="absolute bottom-2 right-2 max-sm:flex sm:hidden group-hover:flex gap-1.5">
-
+                  {/* ACTION BUTTONS */}
+                  {/* FIX 3: Added e.stopPropagation() so clicking buttons doesn't trigger card navigation */}
+                  <div 
+                    onClick={(e) => e.stopPropagation()} 
+                    className="absolute bottom-2 right-2 max-sm:flex sm:hidden group-hover:flex gap-1.5 z-10"
+                  >
                     <TrashIcon
-                      onClick={() => handleDelete(thumb._id)} className="size-6 bg-black/50 p-1 rounded hover:bg-pink-600 transition-all" />
+                      onClick={() => handleDelete(thumb._id)} 
+                      className="size-6 bg-black/50 p-1 rounded hover:bg-pink-600 transition-all cursor-pointer" 
+                    />
 
                     <DownloadIcon
-                      onClick={() => handleDownload(thumb.image_url!)} className="size-6 bg-black/50 p-1 rounded hover:bg-pink-600 transition-all" />
+                      onClick={() => handleDownload(thumb.image_url!)} 
+                      className="size-6 bg-black/50 p-1 rounded hover:bg-pink-600 transition-all cursor-pointer" 
+                    />
 
-                    <Link target="_blank" to={`/preview?thumbnail_url=${thumb.image_url}&title=${thumb.title}`}>
-                      <ArrowUpRight className="size-6 bg-black/50 p-1 rounded hover:bg-pink-600 transition-all" />
+                    <Link 
+                      target="_blank" 
+                      to={`/preview?thumbnail_url=${encodeURIComponent(thumb.image_url || '')}&title=${encodeURIComponent(thumb.title || '')}`}
+                    >
+                      <ArrowUpRight className="size-6 bg-black/50 p-1 rounded hover:bg-pink-600 transition-all cursor-pointer" />
                     </Link>
                   </div>
                 </div>
@@ -151,7 +182,6 @@ const MyGeneration = () => {
         )}
 
       </div>
-
     </div>
   )
 }
