@@ -155,8 +155,14 @@ npm run dev
 
 ## 👨‍💻 Author
 
-Shubham Bind
+1. Shubham Bind
 
-GitHub: https://github.com/Shubham123-k
+GitHub: [https://github.com/Shubham123-k](Link)
 
-LinkedIn: [www.linkedin.com/in/shubham-bind-9a31b4335](http://www.linkedin.com/in/shubham-bind-9a31b4335)
+LinkedIn: [www.linkedin.com/in/shubham-bind-9a31b4335](Link)
+
+2. Sumit Vishwakarma
+
+GitHub: [https://github.com/cjsumit](Link)
+
+LinkedIn: [www.linkedin.com/in/sumit-vishwakarma272](Link)
