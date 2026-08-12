@@ -13,9 +13,9 @@ import api from '../configs/api';
 const Generate = () => {
 
     const { id } = useParams();
-    const {pathname} = useLocation()
+    const { pathname } = useLocation()
     const navigate = useNavigate()
-    const {isLoggedIn} = useAuth()
+    const { isLoggedIn } = useAuth()
     const [title, setTitle] = useState("");
     const [additionalDetails, setAdditionalDetails] = useState("");
 
@@ -29,36 +29,43 @@ const Generate = () => {
     const [styleDropdownOpen, setStyleDropdownOpen] = useState(false);
 
     const handleGenerate = async () => {
-        if(!isLoggedIn) return toast.error('Please login to generate the Thumbnail')
-            if(!title.trim()) return toast.error('Title is required')
-                setLoading(true);
+        if (!isLoggedIn) return toast.error('Please login to generate the Thumbnail')
+        if (!title.trim()) return toast.error('Title is required')
         
+        setLoading(true);
+
         const api_payload = {
             title,
-            promot: additionalDetails,
+            prompt: additionalDetails, // Fixed spelling from "promot" to "prompt"
             style,
             aspect_ratio: aspectRatio,
             color_scheme: colorSchemeId,
             text_overlay: true,
         }
 
-        const {data} = await api.post('/api/thumbanil/generate', api_payload);
-        if(data.thumbanil){
-            navigate('/generate/' + data.thumbnail_id);
-            toast.success(data.message)
+        try {
+            const { data } = await api.post('/api/thumbnail/generate', api_payload);
+            if (data.thumbnail || data.thumbnail_id) {
+                navigate('/generate/' + (data.thumbnail_id || data.thumbnail._id));
+                toast.success(data.message || 'Generation started!');
+            }
+        } catch (error: any) {
+            console.error("Generation error:", error);
+            setLoading(false);
+            toast.error(error?.response?.data?.message || error.message || 'Failed to generate thumbnail');
         }
     }
 
     const fetchThumbnail = async () => {
         try {
-            const { data } = await api.get(`/api/user/thumbanil/${id}`);
+            const { data } = await api.get(`/api/user/thumbnail/${id}`);
             setThumbnail(data?.thumbnail as IThumbnail);
             setLoading(!data?.thumbnail?.image_url);
-            setAdditionalDetails(data?.thumbanil?.user.user_prompt)
-            setTitle(data?.thumbnail?.title)
-            setColorSchemeId(data?.thumbanil?.color_scheme)
-            setAspectRatio(data?.thumbnail?.aspect_ratio)
-            setStyle(data?.thumbnail?.style)
+            setAdditionalDetails(data?.thumbnail?.user?.user_prompt || "")
+            setTitle(data?.thumbnail?.title || "")
+            setColorSchemeId(data?.thumbnail?.color_scheme || colorSchemes[0].id)
+            setAspectRatio(data?.thumbnail?.aspect_ratio || '16:9')
+            setStyle(data?.thumbnail?.style || 'Bold & Graphic')
 
         } catch (error: any) {
             console.log(error);
@@ -67,22 +74,22 @@ const Generate = () => {
     }
 
     useEffect(() => {
-        if(isLoggedIn && id){
+        if (isLoggedIn && id) {
             fetchThumbnail();
         }
-        if(id && loading && isLoggedIn){
-            const interval = setInterval(()=>{
+        if (id && loading && isLoggedIn) {
+            const interval = setInterval(() => {
                 fetchThumbnail()
-            },5000)
-            return ()=> clearInterval(interval)
+            }, 5000)
+            return () => clearInterval(interval)
         }
     }, [id, loading, isLoggedIn])
 
-    useEffect(()=>{
-        if(!id && thumbnail){
+    useEffect(() => {
+        if (!id && thumbnail) {
             setThumbnail(null)
         }
-    },[pathname])
+    }, [pathname])
 
     return (
         <>
@@ -92,7 +99,7 @@ const Generate = () => {
                     <div className='grid lg:grid-cols-[400px_1fr] gap-8'>
                         {/* LEFT PANEL */}
                         <div className={`space-y-6 ${id && 'pointer-events-none'}`}>
-                            <div className='p-6 rounded-2xl bg-white/8 bprder bprder-white/12 shadow-xl space-y-6'>
+                            <div className='p-6 rounded-2xl bg-white/8 border border-white/12 shadow-xl space-y-6'>
                                 <div>
                                     <h2 className='text-xl font-bold text-zinc-100'>Create Your Thumbnail</h2>
                                     <p className='text-sm text-zinc-400'>Describe your vision and let our AI create a stunning thumbnail for you.</p>
@@ -111,7 +118,6 @@ const Generate = () => {
                                     {/* AspectRatioSelector */}
                                     <AspectRatioSelector value={aspectRatio} onChange={setAspectRatio} />
 
-
                                     {/* StyleSelector */}
                                     <StyleSelector value={style} onChange={setStyle} isOpen={styleDropdownOpen} setIsOpen={setStyleDropdownOpen} />
 
@@ -124,14 +130,13 @@ const Generate = () => {
                                             Additional Prompts <span className='text-zinc-400 text-xs'>(optional)</span>
                                         </label>
                                         <textarea value={additionalDetails} onChange={(e) => setAdditionalDetails(e.target.value)} rows={3} placeholder='Add any specific elements, mood or style preference.....' className='w-full px-4 py-3 rounded-lg border border-white/10 bg-white/6 text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-pink-500 resize-none' />
-
                                     </div>
 
                                 </div>
 
                                 {/* BUTTON */}
                                 {!id && (
-                                    <button onClick={handleGenerate} className='text-[15px] w-full py-3.5 rounded-xl font-medium bg-linear-to-b from-pink-500 to-pink-600 hover:from-pink-700 disabled:cursor-not-allowed transition-colors'>
+                                    <button onClick={handleGenerate} disabled={loading} className='text-[15px] w-full py-3.5 rounded-xl font-medium bg-linear-to-b from-pink-500 to-pink-600 hover:from-pink-700 disabled:cursor-not-allowed transition-colors cursor-pointer'>
                                         {loading ? "Generating..." : "Generate Thumbnail"}
                                     </button>
                                 )}

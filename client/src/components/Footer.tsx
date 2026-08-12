@@ -1,8 +1,30 @@
 import { footerData } from "../data/footer";
-import { DribbbleIcon, LinkedinIcon, TwitterIcon, YoutubeIcon } from "lucide-react";
+import { GithubIcon, LinkedinIcon, TwitterIcon } from "lucide-react";
 import { motion } from "motion/react";
 import type { IFooterLink } from "../types";
 import { Link } from "react-router-dom";
+
+interface ITeamMember {
+    name: string;
+    github: string;   // github username -> used for avatar + profile link
+    linkedin: string; // linkedin slug (after linkedin.com/in/)
+    twitter: string;  // twitter/x handle
+}
+
+const members: ITeamMember[] = [
+    {
+        name: "Shubham Bind",
+        github: "Shubham123-k",
+        linkedin: "shubham-bind-53305432b",
+        twitter: "shubhamkbind69",
+    },
+    {
+        name: "Sumit Vishwakarma",
+        github: "cjsumit",
+        linkedin: "sumit-vishwakarma272",
+        twitter: "REPLACE_WITH_TWITTER_HANDLE",
+    },
+];
 
 export default function Footer() {
     return (
@@ -31,6 +53,7 @@ export default function Footer() {
                     </div>
                 ))}
             </motion.div>
+
             <motion.div className="flex flex-col max-md:items-center max-md:text-center gap-2 items-end"
                 initial={{ x: 150, opacity: 0 }}
                 whileInView={{ x: 0, opacity: 1 }}
@@ -38,17 +61,45 @@ export default function Footer() {
                 transition={{ type: "spring", stiffness: 280, damping: 70, mass: 1 }}
             >
                 <p className="max-w-60">Making every customer feel valued—no matter the size of your audience.</p>
-                <div className="flex items-center gap-4 mt-3">
-                    <a href="https://github.com/Shubham123-k" target="_blank" rel="noreferrer">
-                        <DribbbleIcon className="size-5 hover:text-pink-500" />
-                    </a>
-                    <a href="https://www.linkedin.com/in/shubham-bind-53305432b" target="_blank" rel="noreferrer">
-                        <LinkedinIcon className="size-5 hover:text-pink-500" />
-                    </a>
-                    <a href="https://x.com/shubhamkbind69" target="_blank" rel="noreferrer">
-                        <TwitterIcon className="size-5 hover:text-pink-500" />
-                    </a>
+
+                <div className="flex flex-col gap-4 mt-3 max-md:items-center">
+                    {members.map((member) => (
+                        <div key={member.github} className="flex items-center gap-3">
+                            <img
+                                src={`https://github.com/${member.github}.png`}
+                                alt={member.name}
+                                width={32}
+                                height={32}
+                                className="size-8 rounded-full object-cover border border-gray-700"
+                                onError={(e) => {
+                                    (e.target as HTMLImageElement).src = "/favicon.svg";
+                                }}
+                            />
+                            <div className="flex flex-col">
+                                <a
+                                    href={`https://github.com/${member.github}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-slate-100 font-medium hover:text-pink-500"
+                                >
+                                    {member.name}
+                                </a>
+                                <div className="flex items-center gap-3 mt-1">
+                                    <a href={`https://github.com/${member.github}`} target="_blank" rel="noreferrer">
+                                        <GithubIcon className="size-4 hover:text-pink-500" />
+                                    </a>
+                                    <a href={`https://www.linkedin.com/in/${member.linkedin}`} target="_blank" rel="noreferrer">
+                                        <LinkedinIcon className="size-4 hover:text-pink-500" />
+                                    </a>
+                                    <a href={`https://x.com/${member.twitter}`} target="_blank" rel="noreferrer">
+                                        <TwitterIcon className="size-4 hover:text-pink-500" />
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
                 </div>
+
                 <p className="mt-3 text-center">&copy; {new Date().getFullYear()} <Link to="/" className="hover:text-pink-500">Thumbnail X</Link></p>
             </motion.div>
         </footer>

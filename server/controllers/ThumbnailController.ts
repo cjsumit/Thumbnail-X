@@ -1,38 +1,50 @@
 import { Request, Response } from 'express';
 import Thumbnail from '../models/Thumbnail.js';
-import { GenerateContentConfig, HarmBlockThreshold, HarmCategory } from '@google/genai';
-import ai from '../configs/ai.js'
 import path from 'path';
 import fs from 'fs';
-import {v2 as cloudinary} from 'cloudinary'
+import { v2 as cloudinary } from 'cloudinary';
+import ai from '../configs/ai.js';
 
 const stylePrompts = {
-    'Bold & Graphic': 'eye-catching thumbnail, bold typography, vibrant colors, expressive facial reaction, dramatic lighting, high contrast, click-worthy composition, professional style',
-    'Tech/Futuristic': 'futuristic thumbnail, sleek modern design, digital UI elements, glowing accents, holographic effects, cyber-tech aesthetic, sharp lighting, high-tech atmosphere',
-    'Minimalist': 'minimalist thumbnail, clean layout, simple shapes, limited color palette, plenty of negative space, modern flat design, clear focal point',
-    'Photorealistic': 'photorealistic thumbnail, ultra-realistic lighting, natural skin tones, candid moment, DSLR-style photography, lifestyle realism, shallow depth of field',
-    'Illustrated': 'illustrated thumbnail, custom digital illustration, stylized characters, bold outlines, vibrant colors, creative cartoon or vector art style',
-}
+    'Bold & Graphic': 'high-impact YouTube thumbnail, dramatic composition, expressive focal subject, strong visual hierarchy, professional graphic design, 8k resolution',
+    'Tech/Futuristic': 'futuristic YouTube thumbnail, sleek modern aesthetic, glowing neon accents, holographic UI elements, cyber-tech background, sharp studio lighting',
+    'Minimalist': 'minimalist YouTube thumbnail, ultra-clean aesthetic, high contrast, bold central focal point, elegant geometry, sleek modern design',
+    'Photorealistic': 'photorealistic YouTube thumbnail, cinematic lighting, shallow depth of field, 8k DSLR photography, natural skin tones, dramatic shadows',
+    'Illustrated': 'custom digital vector illustration thumbnail, vibrant cartoon art style, bold outlines, energetic character design, creative artwork',
+};
 
 const colorSchemeDescriptions = {
-    vibrant: 'vibrant and energetic colors, high saturation, bold contrasts, eye-catching palette',
-    sunset: 'warm sunset tones, orange pink and purple hues, soft gradients, cinematic glow',
-    forest: 'natural green tones, earthy colors, calm and organic palette, fresh atmosphere',
-    neon: 'neon glow effects, electric blues and pinks, cyberpunk lighting, high contrast glow',
-    purple: 'purple-dominant color palette, magenta and violet tones, modern and stylish mood',
-    monochrome: 'black and white color scheme, high contrast, dramatic lighting, timeless aesthetic',
-    ocean: 'cool blue and teal tones, aquatic color palette, fresh and clean atmosphere',
-    pastel: 'soft pastel colors, low saturation, gentle tones, calm and friendly aesthetic',
-}
+    vibrant: 'electric vibrant colors, neon pinks, bright yellows, high-saturation contrast',
+    sunset: 'cinematic sunset color palette with rich oranges, deep purples, and golden hour lighting',
+    forest: 'rich emerald greens, deep earthy browns, vibrant organic foliage accents',
+    neon: 'cyberpunk neon lighting, glowing cyan and magenta highlights, dark contrast background',
+    purple: 'deep violet and magenta color scheme, glowing purple atmospheric light',
+    monochrome: 'dramatic high-contrast black and white, deep shadows, crisp white highlights',
+    ocean: 'aquatic cyan, deep navy, and bright teal color palette, fresh luminous lighting',
+    pastel: 'soft aesthetic pastel hues, gentle saturation, modern clean color grading',
+};
+
+const aspectRatioToDims: Record<string, { width: number; height: number }> = {
+    '16:9': { width: 1344, height: 768 },
+    '1:1': { width: 1024, height: 1024 },
+    '9:16': { width: 768, height: 1344 },
+    '4:3': { width: 1152, height: 896 },
+};
 
 export const generateThumbnail = async (req: Request, res: Response) => {
+    let thumbnail;
     try {
         const { userId } = req.session;
         const {
             title,
-            prompt: user_prompt, style, aspect_ratio, color_scheme, text_overlay } = req.body;
+            prompt: user_prompt,
+            style,
+            aspect_ratio,
+            color_scheme,
+            text_overlay
+        } = req.body;
 
-        const thumbnail = await Thumbnail.create({
+        thumbnail = await Thumbnail.create({
             userId,
             title,
             prompt_used: user_prompt,
@@ -44,96 +56,113 @@ export const generateThumbnail = async (req: Request, res: Response) => {
             isGenerating: true
         });
 
-        const model = "gemini-3-flash-preview";
+        // 1. Base style definition
+        const styleText = stylePrompts[style as keyof typeof stylePrompts] || stylePrompts['Bold & Graphic'];
+        
+        // 2. Build structured prompt components
+        let promptComponents: string[] = [];
 
-        const generationConfig: GenerateContentConfig = {
-            maxOutputTokens: 32768,
-            temperature: 1,
-            topP: 0.95,
-            responseModalities: ["IMAGE"],
-            imageConfig: {
-                aspectRatio: aspect_ratio || '16:9',
-                imageSize: '1K'
-            },
-            safetySettings: [
-                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.OFF }, { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.OFF }, { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.OFF }, { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.OFF },
-            ]
+        promptComponents.push(`Professional YouTube thumbnail, ${styleText}.`);
+        promptComponents.push(`Central subject & scene topic: "${title}".`);
+
+        // 3. Enforce text overlay if enabled
+        if (text_overlay) {
+            promptComponents.push(
+                `Featuring bold, large, high-contrast 3D typography text overlay reading exact text: "${title.toUpperCase()}". The text must be legible, clean, correctly spelled, and positioned prominently.`
+            );
         }
 
-        let prompt = `Create a ${stylePrompts[style as keyof typeof stylePrompts]} for: "${title}"`
-
-        if(color_scheme) {
-            prompt += `Use a ${colorSchemeDescriptions[color_scheme as keyof typeof colorSchemeDescriptions]} color scheme.`
+        // 4. Enforce color scheme
+        if (color_scheme && colorSchemeDescriptions[color_scheme as keyof typeof colorSchemeDescriptions]) {
+            const colorText = colorSchemeDescriptions[color_scheme as keyof typeof colorSchemeDescriptions];
+            promptComponents.push(
+                `Dominant color theme: ${colorText}. Apply these colors to background rim lighting, text outlines, and key accents.`
+            );
         }
 
-        if(user_prompt) {
-            prompt += `Additional details: ${user_prompt}`
+        // 5. Append additional details from user
+        if (user_prompt) {
+            promptComponents.push(`Additional creative details: ${user_prompt}.`);
         }
 
-        prompt += `The thumbanil should be ${aspect_ratio}, visually stunning, and desigened to maximize click-through rate. Make it bold, professional, and impossible to ignore.`
+        // 6. Quality & Composition Boosters
+        promptComponents.push(
+            `Designed specifically for high click-through rate (CTR), eye-catching visual composition, ultra-sharp detail, professional studio quality.`
+        );
 
-        // Generate the image using the ai model
-        const response: any = await ai.models.generateContent({
-            model,
-            contents: [prompt],
-            config: generationConfig
-        })
+        // Final merged prompt string
+        const finalPrompt = promptComponents.join(' ');
 
-        //Check if the response is valid
-        if(!response?.candidates?.[0]?.content?.parts){
-            throw new Error('Unexpected response')
+        const dims = aspectRatioToDims[aspect_ratio] || aspectRatioToDims['16:9'];
+
+        // Generate the image using FLUX.1-dev
+        const imageBlob = await ai.textToImage(
+    {
+        model: 'black-forest-labs/FLUX.1-schnell',
+        inputs: finalPrompt,
+    },
+    { outputType: 'blob' }
+);
+
+        if (!imageBlob) {
+            throw new Error('No image returned from FLUX.1-dev');
         }
 
-        const parts = response.cadidates[0].content.parts;
+        const finalBuffer = Buffer.from(await imageBlob.arrayBuffer());
 
-        let finalBuffer: Buffer | null = null;
-
-        for(const part of parts){
-            if(part.inlineData){
-                finalBuffer = Buffer.from(part.inlineData.data, 'base64')
-            }
-        }
-
-        const filename = `final-output-${Date.now()}.png`
+        const filename = `final-output-${Date.now()}.png`;
         const filePath = path.join('images', filename);
 
-        
-        //Create the images directory if it doesn't exist
-        fs.mkdirSync('images', {recursive: true})
+        // Create the images directory if it doesn't exist
+        fs.mkdirSync('images', { recursive: true });
 
-        //Write the final image to the file
-        fs.writeFileSync(filePath, finalBuffer!);
+        // Write the final image to disk
+        fs.writeFileSync(filePath, finalBuffer);
 
-        const uploadResult = await cloudinary.uploader.upload(filePath, {resourse_type:'image'})
+        // Upload to Cloudinary (Enforce HTTPS URLs to prevent mixed content warnings)
+        const uploadResult = await cloudinary.uploader.upload(filePath, { 
+            resource_type: 'image',
+            secure: true 
+        });
 
-        thumbnail.image_url = uploadResult.url;
+        // Use secure_url to avoid browser mixed-content/HTTPS warnings
+        thumbnail.image_url = uploadResult.secure_url || uploadResult.url.replace('http://', 'https://');
         thumbnail.isGenerating = false;
-        await thumbnail.save()
+        await thumbnail.save();
 
-        res.json({message: 'Thumbanil Generated'})
+        res.json({ message: 'Thumbnail Generated', thumbnail });
 
-        //remove image file from desk
-        fs.unlinkSync(filePath)
+        // Remove image file from disk
+        fs.unlinkSync(filePath);
 
     } catch (error: any) {
         console.log(error);
-        res.status(500).json({message: error.message});
+
+        if (thumbnail) {
+            thumbnail.isGenerating = false;
+            await thumbnail.save().catch(() => {});
+        }
+
+        res.status(500).json({ message: error.message });
     }
-}
+};
 
-
-//Deletion Controller
+// Deletion Controller
 export const deleteThumbnail = async (req: Request, res: Response) => {
     try {
-        const {id} = req.params;
-        const {userId} = req.session;
+        const { id } = req.params;
+        const { userId } = req.session;
 
-        await Thumbnail.findByIdAndDelete({_id: id, userId})
+        const deleted = await Thumbnail.findOneAndDelete({ _id: id, userId });
 
-        res.json({message: 'Thumbnail deleted successfully'});
+        if (!deleted) {
+            return res.status(404).json({ message: 'Thumbnail not found' });
+        }
+
+        res.json({ message: 'Thumbnail deleted successfully' });
 
     } catch (error: any) {
         console.log(error);
-        res.status(500).json({message: error.message});
+        res.status(500).json({ message: error.message });
     }
-}
+};
