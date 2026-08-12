@@ -157,12 +157,12 @@ npm run dev
 
 1. Shubham Bind
 
-GitHub: [https://github.com/Shubham123-k](Link)
+GitHub: [Link](https://github.com/Shubham123-k)
 
-LinkedIn: [www.linkedin.com/in/shubham-bind-9a31b4335](Link)
+LinkedIn: [Link](www.linkedin.com/in/shubham-bind-9a31b4335)
 
 2. Sumit Vishwakarma
 
-GitHub: [https://github.com/cjsumit](Link)
+GitHub: [Link](https://github.com/cjsumit)
 
-LinkedIn: [www.linkedin.com/in/sumit-vishwakarma272](Link)
+LinkedIn: [Link](www.linkedin.com/in/sumit-vishwakarma272)
